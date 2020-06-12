@@ -24,14 +24,8 @@ type WasmPcRuntime struct {
 	wapcInstance wapc.Instance
 }
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
 // CallContract makes the requried tx call on the wasm contract
-func (wr *WasmPcRuntime) CallContract(fnname string, args [][]byte, txid string, channelid string) {
+func (wr *WasmPcRuntime) CallContract(fnname string, args [][]byte, txid string, channelid string) error {
 
 	msg := &contract.InvokeTransactionRequest{
 		ChannelId:       channelid,
@@ -40,7 +34,9 @@ func (wr *WasmPcRuntime) CallContract(fnname string, args [][]byte, txid string,
 		Args:            args}
 
 	argsBuffer, err := proto.Marshal(msg)
-	check(err)
+	if err != nil {
+		return err
+	}
 
 	log.Printf("[host] calling %s txid=%s", fnname, txid)
 	// result, err := wr.vm.Run(entryID, int64(len(fnBuffer)), int64(len(argsBuffer)))
@@ -48,10 +44,11 @@ func (wr *WasmPcRuntime) CallContract(fnname string, args [][]byte, txid string,
 
 	result, err := wr.wapcInstance.Invoke(wr.ctx, "InvokeTransaction", []byte(argsBuffer))
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	fmt.Println(string(result))
+	return nil
 }
 
 // NewRuntime Get the runtime
@@ -79,6 +76,9 @@ func (wr *WasmPcRuntime) Invoke(APIstub shim.ChaincodeStubInterface) sc.Response
 		bargs[i] = []byte(a)
 	}
 
-	wr.CallContract(function, bargs, txid, channelid)
+	err := wr.CallContract(function, bargs, txid, channelid)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
 	return shim.Success(nil)
 }
